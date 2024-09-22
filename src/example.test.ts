@@ -1,21 +1,19 @@
-import { Entity, MikroORM, PrimaryKey, Property } from '@mikro-orm/sqlite';
+import {Entity, MikroORM, PrimaryKey, Property} from "@mikro-orm/mysql";
 
 @Entity()
 class User {
 
-  @PrimaryKey()
-  id!: number;
+  @PrimaryKey({ unsigned: false })
+  id!: bigint; // number(int) has the same issue.
 
   @Property()
-  name: string;
+  age!: bigint;
 
-  @Property({ unique: true })
-  email: string;
+  @Property({ unsigned: false })
+  price!: bigint;
 
-  constructor(name: string, email: string) {
-    this.name = name;
-    this.email = email;
-  }
+  @Property({ unsigned: true })
+  phone!: bigint;
 
 }
 
@@ -23,7 +21,7 @@ let orm: MikroORM;
 
 beforeAll(async () => {
   orm = await MikroORM.init({
-    dbName: ':memory:',
+    dbName: 'mysql_schema_name',
     entities: [User],
     debug: ['query', 'query-params'],
     allowGlobalContext: true, // only for testing
@@ -35,17 +33,16 @@ afterAll(async () => {
   await orm.close(true);
 });
 
+// This test must pass.
 test('basic CRUD example', async () => {
-  orm.em.create(User, { name: 'Foo', email: 'foo' });
-  await orm.em.flush();
-  orm.em.clear();
+  const generator = orm.schema;
+  const createDump = await generator.getCreateSchemaSQL();
+  const [id, age, price, phone] = createDump
+      .match("create table `user` \\((.+)\\).*;")![1]
+      .split(", ");
 
-  const user = await orm.em.findOneOrFail(User, { email: 'foo' });
-  expect(user.name).toBe('Foo');
-  user.name = 'Bar';
-  orm.em.remove(user);
-  await orm.em.flush();
-
-  const count = await orm.em.count(User, { email: 'foo' });
-  expect(count).toBe(0);
+  expect(id).toBe('`id` bigint not null auto_increment primary key');
+  expect(age).toBe('`age` bigint not null');
+  expect(price).toBe('`price` bigint not null');
+  expect(phone).toBe('`phone` bigint unsigned not null');
 });
