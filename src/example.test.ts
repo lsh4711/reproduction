@@ -1,48 +1,33 @@
-import {Entity, MikroORM, PrimaryKey, Property} from "@mikro-orm/mysql";
+import {EntitySchema, type EntitySchemaMetadata, MikroORM, type Options} from "@mikro-orm/mysql";
 
-@Entity()
-class User {
+type Key = "unsigned" | "signed";
 
-  @PrimaryKey({ unsigned: false })
-  id!: bigint; // number(int) has the same issue.
+type Property = { id: number };
 
-  @Property()
-  age!: bigint;
-
-  @Property({ unsigned: false })
-  price!: bigint;
-
-  @Property({ unsigned: true })
-  phone!: bigint;
-
-}
+const entity: Record<Key, EntitySchemaMetadata<Property>> = {
+  unsigned: {
+    name: "entity",
+    properties: {id: {primary: true, type: "bigint", unsigned: true}}
+  },
+  signed: {
+    name: "entity",
+    properties: {id: {primary: true, type: "bigint", unsigned: false}}
+  }
+};
 
 let orm: MikroORM;
-
-beforeAll(async () => {
-  orm = await MikroORM.init({
-    dbName: 'mysql_schema_name',
-    entities: [User],
-    debug: ['query', 'query-params'],
-    allowGlobalContext: true, // only for testing
-  });
-  await orm.schema.refreshDatabase();
-});
 
 afterAll(async () => {
   await orm.close(true);
 });
 
-// This test must pass.
-test('basic CRUD example', async () => {
-  const generator = orm.schema;
-  const createDump = await generator.getCreateSchemaSQL();
-  const [id, age, price, phone] = createDump
-      .match("create table `user` \\((.+)\\).*;")![1]
-      .split(", ");
+test("MySQL: Should include auto_increment.", async () => {
+  const dbInfo: Options = {dbName: "GH6072", port: 3308};
+  orm = await MikroORM.init({entities: [new EntitySchema(entity.unsigned)], ...dbInfo});
+  await orm.schema.refreshDatabase();
+  const property = orm.getMetadata().get<Property>("entity").properties.id;
 
-  expect(id).toBe('`id` bigint not null auto_increment primary key');
-  expect(age).toBe('`age` bigint not null');
-  expect(price).toBe('`price` bigint not null');
-  expect(phone).toBe('`phone` bigint unsigned not null');
+  property.unsigned = false;
+  const sql1 = await orm.schema.getUpdateSchemaSQL({wrap: false});
+  expect(sql1).toMatch(/^alter table `entity` modify `id` bigint not null auto_increment;.*/);
 });
