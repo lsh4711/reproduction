@@ -1,33 +1,42 @@
-import {EntitySchema, type EntitySchemaMetadata, MikroORM, type Options} from "@mikro-orm/mysql";
+import {Collection, Entity, ManyToMany, MikroORM, PrimaryKey} from "@mikro-orm/postgresql";
 
-type Key = "unsigned" | "signed";
+@Entity()
+class File {
 
-type Property = { id: number };
+  @PrimaryKey()
+  id!: number;
 
-const entity: Record<Key, EntitySchemaMetadata<Property>> = {
-  unsigned: {
-    name: "entity",
-    properties: {id: {primary: true, type: "bigint", unsigned: true}}
-  },
-  signed: {
-    name: "entity",
-    properties: {id: {primary: true, type: "bigint", unsigned: false}}
-  }
-};
+}
+
+@Entity()
+class Project {
+
+  @PrimaryKey()
+  id!: number;
+
+  @ManyToMany({entity: () => File, owner: true})
+  files = new Collection<File>(this);
+
+}
 
 let orm: MikroORM;
 
+beforeAll(async () => {
+  orm = await MikroORM.init({
+    dbName: "6155",
+    entities: [Project, File],
+    debug: ["query", "query-params"],
+    allowGlobalContext: true
+  });
+  await orm.schema.refreshDatabase();
+});
+
 afterAll(async () => {
+  await orm.schema.dropSchema();
   await orm.close(true);
 });
 
-test("MySQL: Should include auto_increment.", async () => {
-  const dbInfo: Options = {dbName: "GH6072", port: 3308};
-  orm = await MikroORM.init({entities: [new EntitySchema(entity.unsigned)], ...dbInfo});
-  await orm.schema.refreshDatabase();
-  const property = orm.getMetadata().get<Property>("entity").properties.id;
-
-  property.unsigned = false;
-  const sql1 = await orm.schema.getUpdateSchemaSQL({wrap: false});
-  expect(sql1).toMatch(/^alter table `entity` modify `id` bigint not null auto_increment;.*/);
+test("6155", async () => {
+  const projectRepository = orm.em.getRepository(Project);
+  await projectRepository.findByCursor({}, {populate: ["files"], first: 20, orderBy: {id: "desc"}});
 });
