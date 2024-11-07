@@ -1,42 +1,27 @@
-import {Collection, Entity, ManyToMany, MikroORM, PrimaryKey} from "@mikro-orm/postgresql";
+import {MikroOrmModule} from "@mikro-orm/nestjs";
+import {EntityManager, MikroORM} from "@mikro-orm/sqlite";
+import {Test, TestingModule} from "@nestjs/testing";
 
-@Entity()
-class File {
-
-  @PrimaryKey()
-  id!: number;
-
-}
-
-@Entity()
-class Project {
-
-  @PrimaryKey()
-  id!: number;
-
-  @ManyToMany({entity: () => File, owner: true})
-  files = new Collection<File>(this);
-
-}
-
+let testModule: TestingModule;
 let orm: MikroORM;
 
-beforeAll(async () => {
-  orm = await MikroORM.init({
-    dbName: "6155",
-    entities: [Project, File],
-    debug: ["query", "query-params"],
-    allowGlobalContext: true
-  });
-  await orm.schema.refreshDatabase();
-});
-
 afterAll(async () => {
-  await orm.schema.dropSchema();
   await orm.close(true);
+  await testModule.close();
 });
 
-test("6155", async () => {
-  const projectRepository = orm.em.getRepository(Project);
-  await projectRepository.findByCursor({}, {populate: ["files"], first: 20, orderBy: {id: "desc"}});
+/*
+6.3.14-dev.56 will pass
+6.3.14-dev.(57 ~ 69) will fail due to signature issue
+6.3.14-dev.70 will fail due to dynamic import issue and needs `ConfigurationLoader.commonJSCompat()`
+ */
+test("6.3.14-dev.70", async () => {
+  testModule = await Test.createTestingModule({
+    imports: [MikroOrmModule.forRoot()]
+  }).compile();
+  orm = testModule.get(MikroORM);
+
+  expect(orm).toBeDefined();
+  expect(orm.config.get("contextName")).toBe("default");
+  expect(testModule.get(EntityManager)).toBeDefined();
 });
