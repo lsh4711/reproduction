@@ -14,6 +14,9 @@ afterAll(async () => {
 6.3.14-dev.56 will pass
 6.3.14-dev.(57 ~ 69) will fail due to signature issue
 6.3.14-dev.70 will fail due to dynamic import issue and needs `ConfigurationLoader.commonJSCompat()`
+
+The issue occurs when running the test with node `--experimental-vm-modules` option
+or when starting the actual server with `nest start`.
  */
 test("6.3.14-dev.70", async () => {
   testModule = await Test.createTestingModule({

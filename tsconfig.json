@@ -7,10 +7,11 @@
     "declaration": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
   },
   "include": [
-    "./src/**/*.ts"
+    "./src/**/*.ts",
+    "./mikro-orm.config.ts"
   ],
   "ts-node": {
     "esm": true,
